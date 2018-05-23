@@ -74,7 +74,6 @@ void first_pass() {
 
   int frame = 0, base = 0;
   int i;
-
   for ( i = 0 ; i < lastop ; i++ ) {
     switch ( op[i].opcode ) {
       case BASENAME:
@@ -91,10 +90,9 @@ void first_pass() {
 	break;
       case VARY:
 	if ( !frame ) {
-	  printf("[vary] frames command not found\n");
+	  printf("[vary] frames command not found. exiting program.\n");
 	  exit(0);
-	}
-	
+	}	
 	break;
     }
   }
@@ -120,7 +118,23 @@ void first_pass() {
   appropirate value.
   ====================*/
 struct vary_node ** second_pass() {
-  return NULL;
+  int n = 0, i = 0;
+  struct vary_node ** v = malloc();
+  for ( n ; n < lastop ; n++ ) {
+    if ( op[n].opcode == VARY ){
+      
+    }
+  }
+  int
+    fstart = op[n].op.vary.start_frame,
+    fend = op[n].op.vary.end_frame;
+  double
+    vstart = op[n].op.vary.start_val,
+    vend = op[n].op.vary.end_val;
+  
+  for ( i ; i < num_frames ; i++ ) {
+  }
+  return v;
 }
 
 /*======== void print_knobs() ==========
