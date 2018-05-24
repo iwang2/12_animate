@@ -72,7 +72,7 @@ void first_pass() {
   extern int num_frames;
   extern char name[128];
 
-  int frame = 0, base = 0;
+  int vary = 0, frame = 0, base = 0;
   int i;
   for ( i = 0 ; i < lastop ; i++ ) {
     switch ( op[i].opcode ) {
@@ -81,21 +81,27 @@ void first_pass() {
 	base = 1;
 	break;
       case FRAMES:
-	frame = 1;
-	if ( !base ) {
-	  printf("[frames] basename not found. default set to \"base\"\n");
-	  name = "base";
+	if ( frame! ) {
+	  printf("[frames] ERROR: multiple frames commands called.\n");
+	  exit(0);
 	}
+	frame = 1;
 	num_frames = op[i].op.frames.num_frames;
 	break;
       case VARY:
-	if ( !frame ) {
-	  printf("[vary] frames command not found. exiting program.\n");
-	  exit(0);
-	}	
+	vary = 1;	
 	break;
     }
   }
+  if ( vary && !frame ) {
+    printf("ERROR: frames command not found for vary. exiting program.\n");
+    exit(0);
+  }
+  if ( !base && frames) {
+    printf("[frames] basename not found. default set to \"base\"\n");
+    name = "base";
+  }
+  
 }
 
 /*======== struct vary_node ** second_pass() ==========
@@ -119,20 +125,21 @@ void first_pass() {
   ====================*/
 struct vary_node ** second_pass() {
   int n = 0, i = 0;
-  struct vary_node ** v = malloc();
+  int fstart, fend;
+  double vstart, vend;
+  double increment; 
+  struct vary_node ** v = calloc(num_frames, sizeof(struct vary_node *));
   for ( n ; n < lastop ; n++ ) {
     if ( op[n].opcode == VARY ){
-      
+      fstart = op[n].op.vary.start_frame;
+      fend = op[n].op.vary.end_frame;
+      vstart = op[n].op.vary.start_val;
+      vend = op[n].op.vary.end_val;
+      increment = ( vend - vstart ) / ( fend - fstart + 1 );
+      for ( i = fstart ; i <= fend ; i++ ) {
+	
+      }
     }
-  }
-  int
-    fstart = op[n].op.vary.start_frame,
-    fend = op[n].op.vary.end_frame;
-  double
-    vstart = op[n].op.vary.start_val,
-    vend = op[n].op.vary.end_val;
-  
-  for ( i ; i < num_frames ; i++ ) {
   }
   return v;
 }
