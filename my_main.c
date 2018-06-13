@@ -71,12 +71,16 @@ void first_pass() {
   //they must be extern variables
   extern int num_frames;
   extern char name[128];
-
   int vary = 0, frame = 0, base = 0;
+  num_frames = 1;
   int i;
   for ( i = 0 ; i < lastop ; i++ ) {
     switch ( op[i].opcode ) {
       case BASENAME:
+	if ( base ) {
+	  printf("[basename] ERROR: multiple basename commands called.\n");
+	  exit(0);
+	}
 	strcpy(name, op[i].op.basename.p->name);
 	base = 1;
 	break;
@@ -94,7 +98,7 @@ void first_pass() {
     }
   }
   if ( vary && !frame ) {
-    printf("ERROR: frames command not found for vary. exiting program.\n");
+    printf("ERROR: frames command not found for vary.\n");
     exit(0);
   }
   if ( !base && frame ) {
@@ -124,29 +128,42 @@ void first_pass() {
   appropirate value.
   ====================*/
 struct vary_node ** second_pass() {
-  int n = 0, i = 0;
-  int fstart, fend;
-  double vstart, vend;
-  double increment; 
+  int n, i;
   struct vary_node ** v = calloc(num_frames, sizeof(struct vary_node *));
-  struct vary_node * prev, * next; 
-  for ( n ; n < lastop ; n++ ) {
+  //struct vary_node * old, * cur;
+  
+  for ( n = 0 ; n < lastop ; n++ ) {
     if ( op[n].opcode == VARY ){
-      fstart = op[n].op.vary.start_frame;
-      fend = op[n].op.vary.end_frame;
-      vstart = op[n].op.vary.start_val;
-      vend = op[n].op.vary.end_val;
-      increment = ( vend - vstart ) / ( fend - fstart );
+      double
+	fstart = op[n].op.vary.start_frame,
+	fend = op[n].op.vary.end_frame,
+	vstart = op[n].op.vary.start_val,
+	vend = op[n].op.vary.end_val;
+      if ( fstart < 0 ||
+	   fend >= num_frames ||
+	   fstart > fend ) {
+	printf("[frames] ERROR: invalid frame range.\n");
+	exit(0);
+      }
+      char * name = op[n].op.vary.p->name;
+      double increment = ( vend - vstart ) / ( fend - fstart );      
       for ( i = fstart ; i <= fend ; i++ ) {
-	next = (struct vary_node *)malloc(sizeof(struct vary_node));
-	prev = v[i];
-	strcpy(next->name, op[n].op.vary.p->name);
-	next->value = vstart + increment * (i - fstart);
-	prev->next = next;
-	v[i] = next; 
+	struct vary_node * new = (struct vary_node *)malloc(sizeof(struct vary_node));
+	struct vary_node * old = v[i];
+	strcpy(new->name, name);
+	new->value = vstart + increment * (i - fstart);
+	new->next = old;
+	v[i] = new; 
       }
     }
   }
+  for ( i = 0 ; i < num_frames ; i++ ){
+    struct vary_node * a = v[i];
+    while ( a ) {
+      a = a->next;
+    }
+  }
+  print_knobs();
   return v;
 }
 
@@ -263,7 +280,6 @@ void my_main() {
     v = second_pass();
   }
 
-  char img[256];
   for ( j = 0 ; j < num_frames ; j++ ) {
     if ( animate ) {
       struct vary_node * current = v[j];
@@ -378,10 +394,14 @@ void my_main() {
 	  zval = op[i].op.move.d[2];
 	  printf("Move: %6.2f %6.2f %6.2f",
 		 xval, yval, zval);
-	  if (op[i].op.move.p != NULL)
-	    {
-	      printf("\tknob: %s",op[i].op.move.p->name);
-	    }
+	  if (op[i].op.move.p != NULL) {
+	    printf("\tknob: %s",op[i].op.move.p->name);
+	    SYMTAB * tab = op[i].op.move.p;
+	    double val = tab->s.value;
+	    xval *= val;
+	    yval *= val;
+	    zval *= val;
+	  }
 	  tmp = make_translate( xval, yval, zval );
 	  matrix_mult(peek(systems), tmp);
 	  copy_matrix(tmp, peek(systems));
@@ -393,10 +413,14 @@ void my_main() {
 	  zval = op[i].op.scale.d[2];
 	  printf("Scale: %6.2f %6.2f %6.2f",
 		 xval, yval, zval);
-	  if (op[i].op.scale.p != NULL)
-	    {
-	      printf("\tknob: %s",op[i].op.scale.p->name);
-	    }
+	  if (op[i].op.scale.p != NULL) {
+	    printf("\tknob: %s",op[i].op.scale.p->name);
+	    SYMTAB * tab = op[i].op.scale.p;
+	    double val = tab->s.value;
+	    xval *= val;
+	    yval *= val;
+	    zval *= val;
+	  }
 	  tmp = make_scale( xval, yval, zval );
 	  matrix_mult(peek(systems), tmp);
 	  copy_matrix(tmp, peek(systems));
@@ -407,10 +431,13 @@ void my_main() {
 	  theta = op[i].op.rotate.degrees;
 	  printf("Rotate: axis: %6.2f degrees: %6.2f",
 		 xval, theta);
-	  if (op[i].op.rotate.p != NULL)
-	    {
-	      printf("\tknob: %s",op[i].op.rotate.p->name);
-	    }
+	  if (op[i].op.rotate.p != NULL) {
+	    printf("\tknob: %s",op[i].op.rotate.p->name);
+	    SYMTAB * tab = op[i].op.rotate.p;
+	    double val = tab->s.value;
+	    xval *= val;
+	    theta *= val;
+	  }
 	  theta*= (M_PI / 180);
 	  if (op[i].op.rotate.axis == 0 )
 	    tmp = make_rotX( theta );
@@ -444,7 +471,8 @@ void my_main() {
     }//end operation loop
 
     if ( num_frames > 1 ) {
-      sprintf(img, "%s/%04d.png", name, j);
+      char img[256];    
+      sprintf(img, "anim/%s%04d.png", name, j);
       save_extension(t, img);
       clear_screen(t);
       clear_zbuffer(zb);
